@@ -1,5 +1,22 @@
+import os
+import threading
+from flask import Flask
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
+
+# Flask-сервер для Render
+app_flask = Flask(__name__)
+
+@app_flask.route('/')
+def home():
+    return "Бот працює!"
+
+def run_flask():
+    port = int(os.environ.get('PORT', 10000))
+    app_flask.run(host="0.0.0.0", port=port)
+
+# Запускаємо Flask у окремому потоці
+threading.Thread(target=run_flask).start()
 
 # Запитання калькулятора
 questions = [
@@ -29,11 +46,9 @@ async def button(update, context):
     query = update.callback_query
     user_id = query.from_user.id
 
-    # Ініціалізація користувача, якщо ще не існує
     if user_id not in users:
         users[user_id] = {'step': 0, 'answers': []}
 
-    # Відправка першого запитання
     step = users[user_id]['step']
     await query.answer()
     await query.edit_message_text(text=questions[step])
@@ -53,12 +68,10 @@ async def handle_input(update, context):
         await update.message.reply_text("Будь ласка, введи число.")
         return
 
-    # Додавання відповіді користувача в список
     users[user_id]['answers'].append(value)
     users[user_id]['step'] += 1
     step = users[user_id]['step']
 
-    # Перевірка на завершення всіх запитів
     if step < len(questions):
         await update.message.reply_text(questions[step])
     else:
@@ -90,8 +103,11 @@ async def handle_input(update, context):
 
         users.pop(user_id)
 
+# Запуск Telegram-бота
 if __name__ == '__main__':
-    TOKEN = "7930140233:AAEsNNbsGS7oQgbiR9q_scPYZtOqfYDSiKg"  # Встав сюди свій токен
+    TOKEN = os.getenv('TELEGRAM_TOKEN')  # Або встав сюди напряму: 'your_bot_token_here'
+    if not TOKEN:
+        raise Exception("TELEGRAM_TOKEN не встановлено!")
 
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
